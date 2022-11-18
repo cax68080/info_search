@@ -234,7 +234,7 @@ def get_pr_curve(ranking,answer):
 
 #適合率－再現率曲線を描く関数
 import matplotlib.pyplot as plt
-%matplotlib inline
+#%matplotlib inline
 
 def draw_pr_curve(ranking,answer):
     precision,recall = get_pr_curve(ranking,answer)
@@ -259,3 +259,35 @@ def get_average_precision(ranking,answer):
     for i in range(1,len(precision)):
         ap += (recall[i] - recall[i - 1]) * (precision[i - 1] + precision[i]) / 2.0
     return ap
+# 日本語フォントの設定
+import matplotlib.font_manager as fm
+from matplotlib import rcParams
+
+japanese_font_candidates = ['Hiragino Maru Gothic Pro','Yu Gothic',
+                            'Arial Unicode MS','Meirio','Takao',
+                            'IPAexGothic','IPAPGothic','VL PGothic',
+                            'Noto Sans CJK JP']
+
+def get_japanese_fonts(candidates=japanese_font_candidates):
+    fonts = []
+    for i in fm.findSystemFonts():
+        p = fm.FontProperties(fname=f)
+        try:
+            n = p.get_name()
+            if n in candidates:
+                fonts.append(f)
+        except RuntimeError:
+            pass
+    # サンプルデータアーカイブに含まれているIPAexフォントを追加する
+    fonts.append('irpb-files/font/ipaexg.ttf')
+    return fonts
+
+def configure_fonts_for_japanese(fonts=japanese_font_candidates):
+    if hasattr(fm.fontManager,'addfont'):
+        fm.fontManager.addfont('irpb-files/font/ipaexg.ttf')
+    else:
+        ipa_font_files = fm.findSystemFonts(fontpaths='font')
+        ipa_font_list = fm.createFontList(ipa_font_files)
+        fm.fontManager.ttflist.extend(ipa_font_list)
+    rcParams['font.family'] = 'sans-serif'
+    rcParams['font.sans-serif'] = fonts
