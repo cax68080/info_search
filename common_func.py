@@ -291,3 +291,58 @@ def configure_fonts_for_japanese(fonts=japanese_font_candidates):
         fm.fontManager.ttflist.extend(ipa_font_list)
     rcParams['font.family'] = 'sans-serif'
     rcParams['font.sans-serif'] = fonts
+
+# weightで重みづけしたvecの値をdicに加算する
+# たとえば、vec=[(id1,val1)]なら、dic[id1] += weight*val1
+def add_weights(dic,vec,weight=1.0):
+    for (id,val) in vec:
+        if not id in vec:
+            dic[id] = 0
+        dic[id] += weight * val
+        
+def Rocchio(query_vec,R_plus_vecs,R_minus_vecs,alpha=1.0,beta=0.75,gamma=0.15):
+    # query_vec = [(id1,val1),(id2,val2),...] から
+    # {id1:alpha * val1,id2:alpha * val2,...}を計算(式(8.1)の第1項)
+    q = {id : alpha * val for (id,val) in query_vec}
+    
+    # 適合文書の文書ベクトルをqに反映させる(式(8.1)の第2項)
+    n = len(R_plus_vecs)
+    if n > 0:
+        w = beta / n
+        # R_plus_vecsの要素にwをかけて加算する
+        for v in R_plus_vecs:
+            add_weights(q,v,weight=w)
+    
+    # 不適合文書の文書ベクトルをqに反映させる(式(8.1)の第3項)
+    n = len(R_minus_vecs)
+    if n > 0:
+        w = -gamma / n
+        for v in R_minus_vecs:
+            add_weights(q,v,weight=w)
+            
+    # 辞書型のデータをbag-of-wordsフォーマットに変換
+    return list(q.items())
+
+# vsm_search_with_feedback関数
+# 適合文書のidリストをR_plusに、不適応文書のidリストをR_minusに指定する
+from gensim.similarities import MatrixSimilarity
+
+def vsm_search_with_feedback(texts,query,R_plus,R_minus):
+    tfidf_model,dic,text_weights = cf.get_tfidfmodel_and_weights(texts)
+    
+    index = MatrixSimilarity(text_weights,num_features=len(dic))
+    query_bows = cf.get_bows([query],dic)
+    query_weights = cf.get_weights(query_bows,dic,tfidf_model)
+    
+    # 適合／不適合文書のベクトルのリストを生成する
+    R_plus_vecs = [text_weights[i] for i in R_plus]
+    R_minus_vecs = [text_weights[i] for i in R_minus]
+    
+    # Rocchioのアルゴリズムでクエリのベクトルquery_weights[0]を修正する
+    feedback_query = Rocchio(query_weights[0],R_plus_vecs,R_minus_vecs)
+    
+    # 修正したクエリと類似度を計算
+    sims = index[feedback_query]
+    
+    return sorted(enumerate(sims),key=lambda x:x[1],reverse=True)
+    
